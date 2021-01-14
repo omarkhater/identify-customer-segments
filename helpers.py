@@ -152,9 +152,18 @@ def impute_nan_most_frequent_category(DataFrame,ColName):
     DataFrame[ColName + "_Imputed"] = DataFrame[ColName]
     DataFrame[ColName + "_Imputed"].fillna(most_frequent_category,inplace=True)
     
+def impute_nan_most_frequent_category(DataFrame,ColName):
+    """
+    Impute categorical data with mode values
+    """
+    most_frequent_category=DataFrame[ColName].mode()[0]
+    # replace nan values with most occured category
+    DataFrame[ColName + "_Imputed"] = DataFrame[ColName]
+    DataFrame[ColName + "_Imputed"].fillna(most_frequent_category,inplace=True)
+    
 def clean_data(df, feat_info):
     """
-    Perform feature trimming, re-encoding, and engineering for demographics data
+    Perform feature trimming, re-encoding, and engineering for demographics data that could be applicable for customers data.
     
     INPUT: 
         - df: Demographics DataFrame
@@ -163,8 +172,12 @@ def clean_data(df, feat_info):
     """
 
     print('Data cleansing pipeline...')
-    print('df shape is {}'.format(df.shape))
-    ### Main cleaning steps:    
+    ### Main cleaning steps:
+    ## 0- drop different columns
+    # These non-numeric columns have different number of categories accross the general, customer datasets. 
+    predeletedcolumns = ['KBA05_GBZ', 'ORTSGR_KLS9', 'TITEL_KZ', 'GEBAEUDETYP']
+    df.drop(predeletedcolumns, axis = 1 , inplace = True)
+    feat_info.drop(predeletedcolumns, axis = 0, inplace = True)
     ## 1- convert missing value codes into NaNs, ...
     print('\t1-Replacing missing values per column with Nan...')
     a = list(feat_info['missing_or_unknown'])
@@ -185,7 +198,6 @@ def clean_data(df, feat_info):
     Threshold = MissingValues.describe()['Per']['75%']
     Todelete = MissingValues.query('Per > {}'.format(Threshold))
     DeletedColumns = df.loc[:,Todelete.index]
-    print('Deleted columns shape is {}'.format(DeletedColumns.shape))
     # 2.2- Remove the outlier columns from the dataset
     
     df.drop(Todelete.index, axis = 1 , inplace = True)
@@ -199,11 +211,9 @@ def clean_data(df, feat_info):
     ThresholdRows = MissingValuesRows.describe()['Per']['75%']
     TodeleteRows = MissingValuesRows.query('Per > {}'.format(ThresholdRows))
     DeletedRows = df.loc[TodeleteRows.index,:]
-    print('Deleted rows shape is {}'.format(DeletedRows.shape))
     df.drop(TodeleteRows.index, axis = 0 , inplace = True)
     df.reset_index(inplace = True , drop = True)
     print('\t\tRemoving the outliars columns and rows done')
-    print('df shape is {}'.format(df.shape))
     # ------------------------------------------------------------------------------------------------
     ## 3- Select, Re-encode, and Engineer column values.
     print('\t3-Feature Engineering...')
@@ -218,43 +228,34 @@ def clean_data(df, feat_info):
     for k,v in To_OH.isna().sum().items():
         if v > 0:
             impute_nan_most_frequent_category(To_OH,k)
-            To_OH.drop(k, axis = 1, inplace = True)
-    print('3.2: df shape is {}'.format(df.shape))    
+            To_OH.drop(k, axis = 1, inplace = True)    
     # 3.3- Re-encode categorical variable(s) to be kept in the analysis.
-    print('To_OH columns are {}'.format(To_OH.columns))
+
     OH_bin_obj = preprocessing.OneHotEncoder().fit(To_OH)
     OH_cat = OH_bin_obj.transform(To_OH)
     OH_cat = pd.DataFrame(OH_cat.toarray(), columns = OH_bin_obj.get_feature_names())
-    print('3.3: shape is {}'.format(df.shape))
     # 3.4- Drop categorical features
     df.drop(cat_var , axis = 1 , inplace = True)
     feat_info.drop(cat_var, axis = 0, inplace = True)
-    print('3.4: df shape is {}'.format(df.shape))
     # 3.5- Append one hot encoded data 
     df = pd.concat([df, OH_cat], axis = 1)
-    print('3.5: df shape is {}'.format(df.shape))
-    print('3.5: OH_cat shape is {}'.format(OH_cat.shape))
     # 3.6- Return the cleaned dataframe.
     # Investigate "PRAEGENDE_JUGENDJAHRE" and engineer new variables.
     df['movement'] = df.PRAEGENDE_JUGENDJAHRE % 2 
     Wealth = [int(i[0]) if type(i) == str else i for i in df.CAMEO_INTL_2015]
     LifeStage = [int(i[1])  if type(i) == str else i for i in df.CAMEO_INTL_2015]
     CAMEO_INTL_2015 = pd.DataFrame(list(zip(Wealth, LifeStage)), columns = ['Waelth', 'LifeStage'])
-    print('3.6: df shape is {}'.format(df.shape))
     # 3.7- Drop mixed features
     df.drop(feat_info.query('type =="mixed"').index, axis = 1, inplace = True)
     # 3.8- Append new features
     df = pd.concat([df,CAMEO_INTL_2015] , axis = 1)
-    print('3.7: df shape is {}'.format(df.shape))
     print('\t\tFeature Engineering done')
-    print('df shape is {}'.format(df.shape))
     # ------------------------------------------------------------------------------------------------
     ## 4- Remove all the missing values
     print('\t4-Removing missing values...')
     df.dropna(inplace = True)
     df.reset_index(inplace = True ,drop = True)
     print('\t\tRemoving missing values done.')
-    print('df shape is {}'.format(df.shape))
     # ------------------------------------------------------------------------------------------------
     print('Cleaning pipeline done')
     return df
