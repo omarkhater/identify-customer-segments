@@ -129,6 +129,15 @@ def map_weights(FinalPCAresults, i):
     indices = np.argsort(FinalPCAresults.iloc[i,:])
     return FinalPCAresults.iloc[i,:][np.flip(indices)]
 
+def color_map(pca_results, row , num_features):
+    print('{} , Explained Variance = {}'.format(row, pca_results.at[row, 'Explained Variance']))
+    a = pca_results.loc[row , list(pca_results.loc[row].abs().sort_values(ascending = False).index)][0:num_features]
+    d = pd.DataFrame(a)
+    fig,ax = plt.subplots(1,1, figsize = (num_features,2))
+    sns.heatmap(d.T, ax = ax, annot=True, fmt="g", cmap='vlag')
+    plt.show()
+    return d
+
 def fit_kmeans(data, centers):
     '''
     INPUT:
@@ -143,6 +152,15 @@ def fit_kmeans(data, centers):
     labels = kmeans.predict(data)
     return labels,Kmeans_obj
 
+def impute_nan_most_frequent_category(DataFrame,ColName):
+    """
+    Impute categorical data with mode values
+    """
+    most_frequent_category=DataFrame[ColName].mode()[0]
+    # replace nan values with most occured category
+    DataFrame[ColName + "_Imputed"] = DataFrame[ColName]
+    DataFrame[ColName + "_Imputed"].fillna(most_frequent_category,inplace=True)
+    
 def impute_nan_most_frequent_category(DataFrame,ColName):
     """
     Impute categorical data with mode values
@@ -228,26 +246,33 @@ def clean_data(df, feat_info):
     for k,v in To_OH.isna().sum().items():
         if v > 0:
             impute_nan_most_frequent_category(To_OH,k)
-            To_OH.drop(k, axis = 1, inplace = True)    
-    # 3.3- Re-encode categorical variable(s) to be kept in the analysis.
+            To_OH.drop(k, axis = 1, inplace = True)
+    
+    # 3.3- Produce meaningful names for one hot encoded features 
+    Names = To_OH.columns
+    To_OH_Names = []
+    for c in Names:
+        for v in To_OH[c].unique():
+            To_OH_Names.append(c + '_' + str(v))
+    # 3.4- Re-encode categorical variable(s) to be kept in the analysis.
 
     OH_bin_obj = preprocessing.OneHotEncoder().fit(To_OH)
     OH_cat = OH_bin_obj.transform(To_OH)
-    OH_cat = pd.DataFrame(OH_cat.toarray(), columns = OH_bin_obj.get_feature_names())
-    # 3.4- Drop categorical features
+    OH_cat = pd.DataFrame(OH_cat.toarray(), columns = To_OH_Names)
+    # 3.5- Drop categorical features
     df.drop(cat_var , axis = 1 , inplace = True)
     feat_info.drop(cat_var, axis = 0, inplace = True)
-    # 3.5- Append one hot encoded data 
+    # 3.6- Append one hot encoded data 
     df = pd.concat([df, OH_cat], axis = 1)
-    # 3.6- Return the cleaned dataframe.
+    # 3.7- Return the cleaned dataframe.
     # Investigate "PRAEGENDE_JUGENDJAHRE" and engineer new variables.
     df['movement'] = df.PRAEGENDE_JUGENDJAHRE % 2 
     Wealth = [int(i[0]) if type(i) == str else i for i in df.CAMEO_INTL_2015]
     LifeStage = [int(i[1])  if type(i) == str else i for i in df.CAMEO_INTL_2015]
     CAMEO_INTL_2015 = pd.DataFrame(list(zip(Wealth, LifeStage)), columns = ['Waelth', 'LifeStage'])
-    # 3.7- Drop mixed features
+    # 3.8- Drop mixed features
     df.drop(feat_info.query('type =="mixed"').index, axis = 1, inplace = True)
-    # 3.8- Append new features
+    # 3.9- Append new features
     df = pd.concat([df,CAMEO_INTL_2015] , axis = 1)
     print('\t\tFeature Engineering done')
     # ------------------------------------------------------------------------------------------------
@@ -257,5 +282,5 @@ def clean_data(df, feat_info):
     df.reset_index(inplace = True ,drop = True)
     print('\t\tRemoving missing values done.')
     # ------------------------------------------------------------------------------------------------
-    print('Cleaning pipeline done')
-    return df
+    print('Cleansing pipeline done')
+    return df, To_OH.columns
