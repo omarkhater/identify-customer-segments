@@ -6,7 +6,7 @@ Identifying segments of the population that form the core customer base for a ma
 Python 3, Jupyter notebook, pandas, seaborn, sci-kit learn, matplotlib 
 
 ## Algorithms and Techniques
-Supervised Learning, Clustering Analysis, Principal component Analysis, K-Means clustering
+Unsupervised Learning, Clustering Analysis, Principal component Analysis, K-Means clustering
 
 ## Background
 The data has been provided by `Bertelsmann Arvato Analytics`, and represents a real-life data science task. Please note that the data is not open source and has been provided exclusively for Udacity Nano-Degree programs. 
